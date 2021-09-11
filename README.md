@@ -1,6 +1,5 @@
 # NLP
 
-1. Transformer
-3. Unsupervised Learning
-4. Bert
-5. GPT
+1. BPE
+2. Wor2Vec - SkipGram
+3. Transformer
