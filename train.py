@@ -11,14 +11,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from itertools import chain
 from torch.optim.lr_scheduler import ExponentialLR
-from torch.utils.data import Dataset, DataLoader , Subset, random_split
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from importlib import import_module
-from nltk.tokenize import word_tokenize
-from konlpy.tag import *
-from dataset import *
 from model import TransformerDecoder, TransformerEncoder
-from loader import *
+from dataset import *
 from preprocessor import *
 from collator import *
 
@@ -59,10 +55,10 @@ def train(args) :
     kor_data = list(text_data['원문'])
     en_data = list(text_data['번역문'])
 
-    # -- Processor
-    mecab = Mecab()
-    kor_processor = Preprocessor(kor_data, kor_preprocess, mecab.morphs)
-    kor_token_path = os.path.join(args.token_dir,'kor_token.csv')
+    pass
+
+    """
+    
     if os.path.exists(kor_token_path) :
         kor_token = pd.read_csv(kor_token_path)
         kor_processor.set_data(kor_token)
@@ -245,14 +241,16 @@ def train(args) :
             
         scheduler.step()
         print('\nVal Loss : %.3f \t Val Accuracy : %.3f\n' %(loss_eval, acc_eval))
-
+    
+    """
 
 if __name__ == '__main__' :
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--seed', type=int, default=777, help='random seed (default: 777)')
     parser.add_argument('--epochs', type=int, default=200, help='number of epochs to train (default: 200)')
-    parser.add_argument('--warmup_steps', type=int, default=4000, help='number of epochs to train (default: 200)')
+    parser.add_argument('--merge_size', type=int, default=6000, help='merge size of bpe (default: 6000)')
+    parser.add_argument('--warmup_steps', type=int, default=4000, help='warmup steps of train (default: 4000)')
     parser.add_argument('--max_size', type=int, default=30, help='max size of sequence (default: 30)')
     parser.add_argument('--layer_size', type=int, default=6, help='layer size of model (default: 6)')
     parser.add_argument('--embedding_size', type=int, default=512, help='embedding size of token (default: 512)')
