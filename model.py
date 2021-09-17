@@ -27,11 +27,9 @@ class LookAheadMask(nn.Module) :
     
     def forward(self, in_tensor) :
         batch_size, _, _, seq_size = in_tensor.shape
-
         mask_tensor = self.get_mask(seq_size)
         if self.cuda_flag :
             mask_tensor = mask_tensor.cuda() 
-        
         lookahead_mask_tensor = torch.maximum(in_tensor, mask_tensor)
         return lookahead_mask_tensor
 
@@ -41,16 +39,14 @@ class PositionalEncoding(nn.Module) :
         self.max_len = max_len
         self.d_model = d_model
         self.cuda_flag = cuda_flag
-
         # w : weight
         # pe : Encoding tensor
         self.w = torch.sqrt(torch.tensor(d_model, dtype=torch.float32, requires_grad=False))
         self.pe = self.get_embedding(max_len, d_model)
-        
         if cuda_flag == True :
             self.w = self.w.cuda()
             self.pe = self.pe.cuda()
-            
+        
     # Embedding tensor : (batch_size, sen_size, embedding_dim)
     # Making Encoding tensor (1, sen_size, embedding_dim)
     def get_embedding(self, pos_len, d_model) :
@@ -91,36 +87,22 @@ class MultiHeadAttention(nn.Module) :
         self.v_layer = nn.Linear(d_model, d_model)
         self.o_layer = nn.Linear(d_model, d_model)
 
-        self.scale = torch.sqrt(torch.tensor(self.depth , 
-                                             dtype=torch.float32 , 
-                                             requires_grad=False))
+        self.scale = torch.sqrt(torch.tensor(self.depth , dtype=torch.float32 , requires_grad=False))
 
+    # tensor shape : (batch_size, sen_size, d_model)
     def split(self, tensor) :
         sen_size = tensor.shape[1]
         tensor = torch.reshape(tensor, (-1, sen_size, self.num_heads, self.depth))     
         tensor = tensor.permute(0,2,1,3) # (batch_size, num_heads, sen_size, depth)
         return tensor
 
+    # tensor shape : (batch_size, num_heads, sen_size, dk)
     def merge(self, tensor) :
         sen_size = tensor.shape[2]
         tensor = tensor.permute(0,2,1,3) # (batch_size, sen_size, num_heads, depth)
         tensor = torch.reshape(tensor, (-1, sen_size, self.d_model)) #(batch_size, sen_size, embedding_dim)
         return tensor
     
-    def mask(self, qk_tensor, m_tensor) :
-        q_size, k_size = qk_tensor.shape[2:]
-        # encoder multihead attention layer
-        # decoder masked multihead attention layer
-        if q_size == k_size :
-            qk_tensor -= (m_tensor*1e+6)
-        # decoder multihead attention layer
-        else :
-            qk_tensor = torch.transpose(qk_tensor, 2,3)
-            qk_tensor -= (m_tensor*1e+6)
-            qk_tensor = torch.transpose(qk_tensor, 2,3)
-        
-        return qk_tensor
-
     # scaled dot production
     def scaled_dot_production(self, q_tensor, k_tensor, v_tensor, m_tensor) :
         q_tensor = self.split(q_tensor)
@@ -132,11 +114,9 @@ class MultiHeadAttention(nn.Module) :
         qk_tensor = torch.matmul(q_tensor , k_tensor_T) # (batch_size, num_heads, sen_size, sen_size)
         qk_tensor /= self.scale
 
-        # pad mask tensor shape : (batch_size, 1, 1, q_sen_size)
-        # lookahead mask tensor shape : (batch_size, 1, q_sen_size, k_sen_size)
         if m_tensor != None :
-            qk_tensor = self.mask(qk_tensor, m_tensor)
-                
+            qk_tensor -= (m_tensor*1e+6)
+            
         qk_tensor = F.softmax(qk_tensor, dim=-1)
         att = torch.matmul(qk_tensor, v_tensor) # (batch_size, num_heads, sen_size, depth)
 
@@ -172,10 +152,14 @@ class FeedForward(nn.Module) :
 class EncoderBlock(nn.Module) :
     def __init__(self, d_model, num_heads, hidden_size, drop_rate, norm_rate) :
         super(EncoderBlock, self).__init__()
+        # multihead attention layer & feedforward layer
         self.mha_layer = MultiHeadAttention(d_model , num_heads)
         self.ff_layer = FeedForward(hidden_size , d_model)
-        self.drop_layer = nn.Dropout(drop_rate)
-        self.norm_layer = nn.LayerNorm(d_model, eps=norm_rate)
+        # dropout layer & layer normalization layer
+        self.drop1_layer = nn.Dropout(drop_rate)
+        self.norm2_layer = nn.LayerNorm(d_model, eps=norm_rate)
+        self.drop1_layer = nn.Dropout(drop_rate)
+        self.norm2_layer = nn.LayerNorm(d_model, eps=norm_rate)
       
         self.init_param()
                 
@@ -188,14 +172,14 @@ class EncoderBlock(nn.Module) :
                 nn.init.zeros_(m.bias)
         
     def forward(self, in_tensor, m_tensor) :
+        # mutlihead attention sub layer
         mha_tensor = self.mha_layer(in_tensor , in_tensor , in_tensor , m_tensor)
-        mha_tensor = self.drop_layer(mha_tensor)
-        
-        h_tensor = self.norm_layer(in_tensor + mha_tensor)
-
+        mha_tensor = self.drop_layer1(mha_tensor)
+        h_tensor = self.norm_layer1(in_tensor + mha_tensor)
+        # feed forward sub layer
         ff_tensor = self.ff_layer(h_tensor)
-        ff_tensor = self.drop_layer(ff_tensor)
-        o_tensor = self.norm_layer(h_tensor + ff_tensor)
+        ff_tensor = self.drop_layer2(ff_tensor)
+        o_tensor = self.norm_layer2(h_tensor + ff_tensor)
 
         return o_tensor
 
@@ -203,11 +187,17 @@ class EncoderBlock(nn.Module) :
 class DecoderBlock(nn.Module) :
     def __init__(self, d_model, num_heads, hidden_size, drop_rate, norm_rate) :
         super(DecoderBlock, self).__init__()
+        # multihead attention layer & feedforward layer
         self.m_mha_layer = MultiHeadAttention(d_model , num_heads)
         self.mha_layer = MultiHeadAttention(d_model , num_heads)
         self.ff_layer = FeedForward(hidden_size , d_model)
-        self.drop_layer = nn.Dropout(drop_rate)
-        self.norm_layer = nn.LayerNorm(d_model, eps=norm_rate)
+        # dropout layer & layer normalization layer
+        self.drop1_layer = nn.Dropout(drop_rate)
+        self.norm1_layer = nn.LayerNorm(d_model, eps=norm_rate)
+        self.drop2_layer = nn.Dropout(drop_rate)
+        self.norm2_layer = nn.LayerNorm(d_model, eps=norm_rate)
+        self.drop3_layer = nn.Dropout(drop_rate)
+        self.norm3_layer = nn.LayerNorm(d_model, eps=norm_rate)
 
         self.init_param()
                 
@@ -219,36 +209,26 @@ class DecoderBlock(nn.Module) :
                 nn.init.kaiming_normal_(m.weight , gain)
                 nn.init.zeros_(m.bias)
         
-    # decoder input
-    # encoder output
-    # pad tensor
-    # lookahead mask_tensor
-    def forward(self, in_tensor, en_out_tensor, pad_mask, lookahead_mask) :
-        # query : in_tensor
-        # key : in_tensor 
-        # value : in_tensor 
-        # mask ; look ahead mask
-        m_mha_tensor = self.m_mha_layer(in_tensor, in_tensor, in_tensor, lookahead_mask)
-        m_mha_tensor = self.drop_layer(m_mha_tensor)
-        h_tensor = self.norm_layer(in_tensor + m_mha_tensor)
-
-        # query : output of masked multihead attention
-        # key : encoder output , 
-        # value : encoder output , 
-        # mask ; pad mask
-        mha_tensor = self.mha_layer(h_tensor, en_out_tensor, en_out_tensor, pad_mask)
-        mha_tensor = self.drop_layer(mha_tensor)
-        a_tensor = self.norm_layer(h_tensor+mha_tensor)
-
+    def forward(self, in_tensor, en_out_tensor, en_pad_mask, de_lookahead_mask) :
+        # masked multihead attention sub layer
+        # query : in_tensor, key : in_tensor, value : in_tensor, mask ; look ahead mask
+        m_mha_tensor = self.m_mha_layer(in_tensor, in_tensor, in_tensor, de_lookahead_mask)
+        m_mha_tensor = self.drop1_layer(m_mha_tensor)
+        h_tensor = self.norm1_layer(in_tensor + m_mha_tensor)
+        # multihead attention sub layer
+        # query : decoder output, key : encoder output, value : encoder output , mask ; pad mask
+        mha_tensor = self.mha_layer(h_tensor, en_out_tensor, en_out_tensor, en_pad_mask)
+        mha_tensor = self.drop2_layer(mha_tensor)
+        a_tensor = self.norm2_layer(h_tensor+mha_tensor)
+        # feedforward sub layer
         ff_tensor = self.ff_layer(a_tensor)
-        ff_tensor = self.drop_layer(ff_tensor)
-        o_tensor = self.norm_layer(a_tensor+ff_tensor)
+        ff_tensor = self.drop3_layer(ff_tensor)
+        o_tensor = self.norm3_layer(a_tensor+ff_tensor)
         
         return o_tensor
 
 # Transformer Encoder
 class TransformerEncoder(nn.Module) :
-
     def __init__(self, layer_size, max_size, v_size, d_model, num_heads, hidden_size, 
                  drop_rate, norm_rate, cuda_flag) :
         super(TransformerEncoder , self).__init__()
@@ -273,6 +253,7 @@ class TransformerEncoder(nn.Module) :
 
         for i in range(layer_size) :
             self.en_blocks.append(EncoderBlock(d_model, num_heads, hidden_size, drop_rate, norm_rate))
+        
         self.init_param()
             
     def set_embedding(self, em_weight) :
@@ -280,16 +261,14 @@ class TransformerEncoder(nn.Module) :
         assert em_v_size == self.v_size
         assert em_h_size == self.d_model
         em_weight = torch.tensor(em_weight)
-        self.em = nn.Embedding.from_pretrained(em_weight,
-                                               freeze=True,
-                                               padding_idx=0)
+        self.em = nn.Embedding.from_pretrained(em_weight, freeze=True, padding_idx=0)
             
     def init_param(self) :
         nn.init.normal_(self.em.weight, mean=0.0, std=0.1)
             
     def forward(self, in_tensor) :
         # masking tensor
-        pad_mask = self.pad(in_tensor)
+        en_pad_mask = self.pad(in_tensor)
         # encoder input tensor
         em_tensor = self.em(in_tensor) # embedding
         en_tensor = self.pos(em_tensor) # positional encoding
@@ -297,9 +276,9 @@ class TransformerEncoder(nn.Module) :
         
         tensor_ptr = en_tensor
         for i in range(self.layer_size) :
-            tensor_ptr = self.en_blocks[i](tensor_ptr, pad_mask)
+            tensor_ptr = self.en_blocks[i](tensor_ptr, en_pad_mask)
         
-        return tensor_ptr
+        return tensor_ptr, en_pad_mask
 
 # Transformer Decoder
 class TransformerDecoder(nn.Module) :
@@ -343,10 +322,7 @@ class TransformerDecoder(nn.Module) :
         assert em_v_size == self.v_size
         assert em_h_size == self.d_model
         em_weight = torch.tensor(em_weight)
-        self.em = nn.Embedding.from_pretrained(em_weight,
-                                               freeze=True,
-                                               padding_idx=0)
-        
+        self.em = nn.Embedding.from_pretrained(em_weight, freeze=True, padding_idx=0)
         self.o_layer.weight = nn.Parameter(em_weight, requires_grad=False)
         
     # output layer bias from pretrained : not trainable
@@ -354,10 +330,10 @@ class TransformerDecoder(nn.Module) :
         bias = torch.tensor(bias)
         self.o_layer.bias = nn.Parameter(bias, requires_grad=False)
 
-    def forward(self, in_tensor, en_out_tensor) :
+    def forward(self, in_tensor, en_out_tensor, en_pad_mask) :
         # masking tensor
-        pad_mask = self.pad(in_tensor)
-        lookahead_mask = self.lookahead(pad_mask)
+        de_pad_mask = self.pad(in_tensor)
+        de_lookahead_mask = self.lookahead(de_pad_mask)
         # decoder input tensor
         em_tensor = self.em(in_tensor) # embedding
         de_tensor = self.pos(em_tensor) # positional encoding
@@ -365,7 +341,7 @@ class TransformerDecoder(nn.Module) :
         
         tensor_ptr = de_tensor
         for i in range(self.layer_size) :
-            tensor_ptr = self.de_blocks[i](tensor_ptr, en_out_tensor, pad_mask, lookahead_mask)
+            tensor_ptr = self.de_blocks[i](tensor_ptr, en_out_tensor, en_pad_mask, de_lookahead_mask)
         o_tensor = self.o_layer(tensor_ptr)
         
         return o_tensor
