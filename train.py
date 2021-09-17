@@ -55,29 +55,36 @@ def train(args) :
     kor_data = list(text_data['원문'])
     en_data = list(text_data['번역문'])
 
-    pass
+    # -- Tokenizer & Encoder
+    en_text_path = os.path.join(args.token_dir, 'english.txt')
+    if os.path.exists(en_text_path) == False:
+        write_data(en_data, en_text_path, preprocess_en)
+    en_spm = get_spm(args.token_dir, 'english.txt' , 'en_spm' , args.token_size)
+    en_v_size = len(en_spm)
 
-    """
-    
-    if os.path.exists(kor_token_path) :
-        kor_token = pd.read_csv(kor_token_path)
-        kor_processor.set_data(kor_token)
-    else :
-        kor_token = kor_processor.get_data()
-
-    en_processor = Preprocessor(en_data, en_preprocess, word_tokenize)
-    en_token_path = os.path.join(args.token_dir,'en_token.csv')
-    if os.path.exists(en_token_path) :
-        en_token = pd.read_csv(en_token_path)
-        en_processor.set_data(en_token)
-    else :
-        en_token = en_processor.get_data()
+    kor_text_path = os.path.join(args.token_dir, 'korean.txt')
+    if os.path.exists(kor_text_path) == False:
+        write_data(kor_data, kor_text_path, preprocess_kor)
+    kor_spm = get_spm(args.token_dir, 'korean.txt' , 'kor_spm' , args.token_size)
+    kor_v_size = len(kor_spm)
 
     # -- Dataset
-    kor_index = kor_processor.encode()
-    en_index = en_processor.encode()
+    data_size = len(text_data)
 
-    dset = TranslationDataset(kor_index, en_index, args.max_size)
+    en_index_data = []
+    kor_index_data = []
+    for i in range(data_size) :
+        en_sen = en_data[i]
+        en_sen = preprocess_en(en_sen)
+        en_index_list = en_spm.encode_as_ids(en_sen)
+        en_index_data.append(en_index_list)
+        kor_sen = kor_data[i]
+        kor_sen = preprocess_kor(kor_sen)
+        kor_index_list = kor_spm.encode_as_ids(kor_sen)
+        kor_index_data.append(kor_index_list)
+
+
+    dset = TranslationDataset(kor_index_data, en_index_data, args.max_size)
     train_dset, val_dset = dset.split()
 
     train_len = [(len(data[0]),len(data[1])) for data in train_dset]
@@ -101,7 +108,7 @@ def train(args) :
     # Transformer Encoder
     encoder = TransformerEncoder(layer_size=args.layer_size, 
         max_size=args.max_size, 
-        v_size=len(kor_token), 
+        v_size=kor_v_size, 
         d_model=args.embedding_size,
         num_heads=args.head_size,
         hidden_size=args.hidden_size,
@@ -112,7 +119,7 @@ def train(args) :
     # Transformer Decoder
     decoder = TransformerDecoder(layer_size=args.layer_size, 
         max_size=args.max_size, 
-        v_size=len(en_token), 
+        v_size=en_v_size, 
         d_model=args.embedding_size,
         num_heads=args.head_size,
         hidden_size=args.hidden_size,
@@ -124,6 +131,7 @@ def train(args) :
     # Set Embedding
     kor_embedding_path = os.path.join(args.embedding_dir,'kor_weight.npy')
     if os.path.exists(kor_embedding_path) :
+        print('Load Encoder Embedding')
         kor_weight = np.load(kor_embedding_path)
         encoder.set_embedding(kor_weight)
     encoder = encoder.to(device)
@@ -131,9 +139,11 @@ def train(args) :
     en_embedding_path = os.path.join(args.embedding_dir,'en_weight.npy')
     en_bias_path = os.path.join(args.embedding_dir,'en_bias.npy')
     if os.path.exists(en_embedding_path) :
+        print('Load Decoder Embedding')
         en_weight = np.load(en_embedding_path)
         decoder.set_embedding(en_weight)
     if os.path.exists(en_bias_path) :
+        print('Load Decoder Bias')
         en_bias = np.load(en_bias_path)
         decoder.set_bias(en_bias)
     decoder = decoder.to(device)
@@ -177,9 +187,9 @@ def train(args) :
 
             optimizer.zero_grad()
         
-            en_output = encoder(en_in)
-            de_output = decoder(de_in, en_output)
-            de_output = torch.reshape(de_output, (-1,len(en_token)))
+            en_output, en_pad = encoder(en_in)
+            de_output = decoder(de_in, en_output, en_pad)
+            de_output = torch.reshape(de_output, (-1,en_v_size))
 
             loss = criterion(de_output , de_label)
             acc = (torch.argmax(de_output, dim=-1) == de_label).float().mean()
@@ -193,7 +203,6 @@ def train(args) :
                 writer.add_scalar('train/loss', loss.item(), log_count)
                 writer.add_scalar('train/acc', acc.item(), log_count)
                 log_count += 1
-
             idx += 1
 
         # validation process
@@ -211,9 +220,9 @@ def train(args) :
                 de_label = data['decoder_out'].long().to(device)
                 de_label = torch.reshape(de_label, (-1,))
 
-                en_output = encoder(en_in)
-                de_output = decoder(de_in, en_output)
-                de_output = torch.reshape(de_output, (-1,len(en_token)))
+                en_output, en_pad = encoder(en_in)
+                de_output = decoder(de_in, en_output, en_pad)
+                de_output = torch.reshape(de_output, (-1,en_v_size))
 
                 loss_eval += criterion(de_output, de_label)
                 acc_eval += (torch.argmax(de_output, dim=-1) == de_label).float().mean()  
@@ -242,14 +251,12 @@ def train(args) :
         scheduler.step()
         print('\nVal Loss : %.3f \t Val Accuracy : %.3f\n' %(loss_eval, acc_eval))
     
-    """
-
 if __name__ == '__main__' :
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--seed', type=int, default=777, help='random seed (default: 777)')
     parser.add_argument('--epochs', type=int, default=200, help='number of epochs to train (default: 200)')
-    parser.add_argument('--merge_size', type=int, default=6000, help='merge size of bpe (default: 6000)')
+    parser.add_argument('--token_size', type=int, default=7000, help='merge size of bpe (default: 7000)')
     parser.add_argument('--warmup_steps', type=int, default=4000, help='warmup steps of train (default: 4000)')
     parser.add_argument('--max_size', type=int, default=30, help='max size of sequence (default: 30)')
     parser.add_argument('--layer_size', type=int, default=6, help='layer size of model (default: 6)')

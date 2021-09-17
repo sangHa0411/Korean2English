@@ -157,8 +157,8 @@ class EncoderBlock(nn.Module) :
         self.ff_layer = FeedForward(hidden_size , d_model)
         # dropout layer & layer normalization layer
         self.drop1_layer = nn.Dropout(drop_rate)
-        self.norm2_layer = nn.LayerNorm(d_model, eps=norm_rate)
-        self.drop1_layer = nn.Dropout(drop_rate)
+        self.norm1_layer = nn.LayerNorm(d_model, eps=norm_rate)
+        self.drop2_layer = nn.Dropout(drop_rate)
         self.norm2_layer = nn.LayerNorm(d_model, eps=norm_rate)
       
         self.init_param()
@@ -174,12 +174,12 @@ class EncoderBlock(nn.Module) :
     def forward(self, in_tensor, m_tensor) :
         # mutlihead attention sub layer
         mha_tensor = self.mha_layer(in_tensor , in_tensor , in_tensor , m_tensor)
-        mha_tensor = self.drop_layer1(mha_tensor)
-        h_tensor = self.norm_layer1(in_tensor + mha_tensor)
+        mha_tensor = self.drop1_layer(mha_tensor)
+        h_tensor = self.norm1_layer(in_tensor + mha_tensor)
         # feed forward sub layer
         ff_tensor = self.ff_layer(h_tensor)
-        ff_tensor = self.drop_layer2(ff_tensor)
-        o_tensor = self.norm_layer2(h_tensor + ff_tensor)
+        ff_tensor = self.drop2_layer(ff_tensor)
+        o_tensor = self.norm2_layer(h_tensor + ff_tensor)
 
         return o_tensor
 
