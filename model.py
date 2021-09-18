@@ -160,17 +160,7 @@ class EncoderBlock(nn.Module) :
         self.norm1_layer = nn.LayerNorm(d_model, eps=norm_rate)
         self.drop2_layer = nn.Dropout(drop_rate)
         self.norm2_layer = nn.LayerNorm(d_model, eps=norm_rate)
-      
-        self.init_param()
                 
-    # He Initialization
-    def init_param(self) :
-        gain = 2 ** (1/2)
-        for m in self.modules() :
-            if isinstance(m , nn.Linear) :
-                nn.init.kaiming_normal_(m.weight , gain)
-                nn.init.zeros_(m.bias)
-        
     def forward(self, in_tensor, m_tensor) :
         # mutlihead attention sub layer
         mha_tensor = self.mha_layer(in_tensor , in_tensor , in_tensor , m_tensor)
@@ -198,17 +188,7 @@ class DecoderBlock(nn.Module) :
         self.norm2_layer = nn.LayerNorm(d_model, eps=norm_rate)
         self.drop3_layer = nn.Dropout(drop_rate)
         self.norm3_layer = nn.LayerNorm(d_model, eps=norm_rate)
-
-        self.init_param()
                 
-    # He Initialization
-    def init_param(self) :
-        gain = 2 ** (1/2)
-        for m in self.modules() :
-            if isinstance(m , nn.Linear) :
-                nn.init.kaiming_normal_(m.weight , gain)
-                nn.init.zeros_(m.bias)
-        
     def forward(self, in_tensor, en_out_tensor, en_pad_mask, de_lookahead_mask) :
         # masked multihead attention sub layer
         # query : in_tensor, key : in_tensor, value : in_tensor, mask ; look ahead mask
@@ -255,16 +235,11 @@ class TransformerEncoder(nn.Module) :
             self.en_blocks.append(EncoderBlock(d_model, num_heads, hidden_size, drop_rate, norm_rate))
         
         self.init_param()
-            
-    def set_embedding(self, em_weight) :
-        em_v_size, em_h_size = em_weight.shape
-        assert em_v_size == self.v_size
-        assert em_h_size == self.d_model
-        em_weight = torch.tensor(em_weight)
-        self.em = nn.Embedding.from_pretrained(em_weight, freeze=True, padding_idx=0)
-            
+        
     def init_param(self) :
-        nn.init.normal_(self.em.weight, mean=0.0, std=0.1)
+        for p in self.parameters() :
+            if p.dim() > 1 :
+                nn.init.xavier_uniform_(p)
             
     def forward(self, in_tensor) :
         # masking tensor
@@ -312,23 +287,9 @@ class TransformerDecoder(nn.Module) :
         self.init_param()
         
     def init_param(self) :
-        nn.init.normal_(self.em.weight, mean=0.0, std=0.1)
-        nn.init.xavier_normal_(self.o_layer.weight, gain=1.0)
-        nn.init.zeros_(self.o_layer.bias)
-        
-    # embedding layer, output layer weight from pretrained : not trainable
-    def set_embedding(self, em_weight) :
-        em_v_size, em_h_size = em_weight.shape
-        assert em_v_size == self.v_size
-        assert em_h_size == self.d_model
-        em_weight = torch.tensor(em_weight)
-        self.em = nn.Embedding.from_pretrained(em_weight, freeze=True, padding_idx=0)
-        self.o_layer.weight = nn.Parameter(em_weight, requires_grad=False)
-        
-    # output layer bias from pretrained : not trainable
-    def set_bias(self, bias) :
-        bias = torch.tensor(bias)
-        self.o_layer.bias = nn.Parameter(bias, requires_grad=False)
+        for p in self.parameters() :
+            if p.dim() > 1 :
+                nn.init.xavier_uniform_(p)
 
     def forward(self, in_tensor, en_out_tensor, en_pad_mask) :
         # masking tensor
