@@ -83,8 +83,7 @@ def train(args) :
         kor_index_list = kor_spm.encode_as_ids(kor_sen)
         kor_index_data.append(kor_index_list)
 
-
-    dset = TranslationDataset(kor_index_data, en_index_data, args.max_size)
+    dset = TranslationDataset(kor_index_data, en_index_data, args.max_size, args.val_ratio)
     train_dset, val_dset = dset.split()
 
     train_len = [(len(data[0]),len(data[1])) for data in train_dset]
@@ -115,7 +114,7 @@ def train(args) :
         drop_rate=0.1,
         norm_rate=1e-6,
         cuda_flag=use_cuda
-    )
+    ).to(device)
     # Transformer Decoder
     decoder = TransformerDecoder(layer_size=args.layer_size, 
         max_size=args.max_size, 
@@ -126,27 +125,7 @@ def train(args) :
         drop_rate=0.1,
         norm_rate=1e-6,
         cuda_flag=use_cuda
-    )
-
-    # Set Embedding
-    kor_embedding_path = os.path.join(args.embedding_dir,'kor_weight.npy')
-    if os.path.exists(kor_embedding_path) :
-        print('Load Encoder Embedding')
-        kor_weight = np.load(kor_embedding_path)
-        encoder.set_embedding(kor_weight)
-    encoder = encoder.to(device)
-
-    en_embedding_path = os.path.join(args.embedding_dir,'en_weight.npy')
-    en_bias_path = os.path.join(args.embedding_dir,'en_bias.npy')
-    if os.path.exists(en_embedding_path) :
-        print('Load Decoder Embedding')
-        en_weight = np.load(en_embedding_path)
-        decoder.set_embedding(en_weight)
-    if os.path.exists(en_bias_path) :
-        print('Load Decoder Bias')
-        en_bias = np.load(en_bias_path)
-        decoder.set_bias(en_bias)
-    decoder = decoder.to(device)
+    ).to(device)
 
     model_parameters = chain(encoder.parameters(), decoder.parameters())
     
@@ -255,7 +234,7 @@ if __name__ == '__main__' :
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--seed', type=int, default=777, help='random seed (default: 777)')
-    parser.add_argument('--epochs', type=int, default=200, help='number of epochs to train (default: 200)')
+    parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 200)')
     parser.add_argument('--token_size', type=int, default=7000, help='merge size of bpe (default: 7000)')
     parser.add_argument('--warmup_steps', type=int, default=4000, help='warmup steps of train (default: 4000)')
     parser.add_argument('--max_size', type=int, default=30, help='max size of sequence (default: 30)')
@@ -264,7 +243,7 @@ if __name__ == '__main__' :
     parser.add_argument('--hidden_size', type=int, default=2048, help='hidden size of position-wise layer (default: 2048)')
     parser.add_argument('--head_size', type=int, default=8, help='head size of multi head attention (default: 8)')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')
-    parser.add_argument('--val_batch_size', type=int, default=128, help='input batch size for validing (default: 128)')
+    parser.add_argument('--val_batch_size', type=int, default=64, help='input batch size for validing (default: 64)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
 
     # Container environment
