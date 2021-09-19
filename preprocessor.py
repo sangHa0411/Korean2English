@@ -1,6 +1,7 @@
 import re
 import os
 import sentencepiece as spm
+from dataset import Token
 
 spm_templates= '--input={} \
 --pad_id={} \
