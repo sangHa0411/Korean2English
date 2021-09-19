@@ -37,29 +37,21 @@ def write_data(text_list, text_path, preprocess) :
             sen = preprocess(sen)
             f.write(sen + '\n')
 
+def train_spm(dir_path, text_path, model_name, vocab_size) :
+    spm_cmd = spm_templates.format(text_path, 
+        Token.PAD,
+        Token.SOS, 
+        Token.EOS, 
+        Token.UNK, 
+        os.path.join(dir_path, model_name), 
+        vocab_size, 
+        1.0, 
+        'unigram')
+    spm.SentencePieceTrainer.Train(spm_cmd)
 
-def get_spm(dir_path, text_name, model_name, vocab_size) :
-    text_path = os.path.join(dir_path, text_name)
-    model_path = os.path.join(dir_path, model_name + '.model')
-
-    if os.path.exists(model_path) :
-        print('Load SentencePiece Model')
-    else :
-        print('Make & Train SentencePiece Model')
-        spm_cmd = spm_templates.format(text_path, 
-            Token.PAD,
-            Token.SOS, 
-            Token.EOS, 
-            Token.UNK, 
-            os.path.join(dir_path, model_name), 
-            vocab_size, 
-            1.0, 
-            'unigram')
-        spm.SentencePieceTrainer.Train(spm_cmd)
-        
-
+def get_spm(dir_path, model_name) :
+    model_path = os.path.join(dir_path, model_name+'.model')
     sp = spm.SentencePieceProcessor()
     sp.Load(model_path)
     sp.SetEncodeExtraOptions('bos:eos')
-
     return sp
