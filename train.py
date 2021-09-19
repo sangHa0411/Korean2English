@@ -59,14 +59,17 @@ def train(args) :
     en_text_path = os.path.join(args.token_dir, 'english.txt')
     if os.path.exists(en_text_path) == False:
         write_data(en_data, en_text_path, preprocess_en)
-    en_spm = get_spm(args.token_dir, 'english.txt' , 'en_spm' , args.token_size)
+        train_spm(args.token_dir, en_text_path, 'en_tokenizer', args.token_size)
+    en_spm = get_spm(args.token_dir, 'en_tokenizer')
     en_v_size = len(en_spm)
 
     kor_text_path = os.path.join(args.token_dir, 'korean.txt')
     if os.path.exists(kor_text_path) == False:
         write_data(kor_data, kor_text_path, preprocess_kor)
-    kor_spm = get_spm(args.token_dir, 'korean.txt' , 'kor_spm' , args.token_size)
+        train_spm(args.token_dir, kor_text_path, 'kor_tokenizer', args.token_size)
+    kor_spm = get_spm(args.token_dir, 'kor_tokenizer')
     kor_v_size = len(kor_spm)
+
 
     # -- Dataset
     data_size = len(text_data)
