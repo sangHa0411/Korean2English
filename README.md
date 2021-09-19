@@ -12,11 +12,6 @@
   |   |-- kor_tokenizer.model
   |   |-- kor_tokenizer.vocab
   |   `-- korean.txt
-  |-- __pycache__
-  |   |-- collator.cpython-38.pyc
-  |   |-- dataset.cpython-38.pyc
-  |   |-- model.cpython-38.pyc
-  |   `-- preprocessor.cpython-38.pyc
   |-- collator.py
   |-- dataset.py
   |-- model.py
