@@ -1,5 +1,11 @@
 import torch
-from torch.utils.data import Dataset, Subset, random_split
+from torch.utils.data import Dataset, random_split
+
+class Token(IntEnum) :
+    PAD = 0
+    UNK = 1
+    SOS = 2
+    EOS = 3
 
 class TranslationDataset(Dataset) :
     def __init__(self, en_index, de_index, max_size, val_ratio=0.1) :
