@@ -39,4 +39,7 @@
   3. validation_ratio : 0.2
   4. warmup_steps : 4000
 
-
+## Source
+  1. aihub : https://aihub.or.kr/aihub-data/natural-language/about
+  2. 한국어 - 영어 변역 말뭉치
+  
