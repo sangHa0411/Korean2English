@@ -23,7 +23,6 @@
 ## Embedding
   1. Subword Tokenization
   2. SentencePiece
-  3. Wor2Vec - SkipGram
 
 ## Model Specification
   1. layer_size : 6
