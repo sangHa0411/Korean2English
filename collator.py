@@ -1,7 +1,7 @@
 import random
 import collections
 from operator import itemgetter
-from preprocessor import Token
+from dataset import Token
 import torch
 from torch.nn.utils.rnn import pad_sequence
 
