@@ -26,11 +26,12 @@
       * Korean : 7000
   
 ## Model Specification
-  1. Layer_size : 6
-  2. Embedding size : 512
-  3. Hidden size : 2048
-  4. Seq size : 30
-  5. Head size : 8
+  1. Structure : Transformer 
+  2. Layer_size : 6
+  3. Embedding size : 512
+  4. Hidden size : 2048
+  5. Seq size : 30
+  6. Head size : 8
 
 ## Training
   1. epoch_size : 100
