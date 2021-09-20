@@ -1,5 +1,6 @@
 # Korean - English Translation
-  1. Driectory Structure
+
+## Modules
   ```
   |-- Log
   |-- Model
@@ -16,7 +17,6 @@
   |-- preprocessor.py
   `-- train.py
   ```
-  2. Soruce : Korean, Target : English
 
 ## Tokenizer Speicication
   1. Subword Tokenization
