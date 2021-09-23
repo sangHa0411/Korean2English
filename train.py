@@ -237,13 +237,13 @@ if __name__ == '__main__' :
 
     parser.add_argument('--seed', type=int, default=777, help='random seed (default: 777)')
     parser.add_argument('--epochs', type=int, default=150, help='number of epochs to train (default: 150)')
-    parser.add_argument('--token_size', type=int, default=11000, help='merge size of bpe (default: 11000)')
+    parser.add_argument('--token_size', type=int, default=13000, help='merge size of bpe (default: 13000)')
     parser.add_argument('--warmup_steps', type=int, default=4000, help='warmup steps of train (default: 4000)')
     parser.add_argument('--max_size', type=int, default=30, help='max size of sequence (default: 30)')
     parser.add_argument('--layer_size', type=int, default=6, help='layer size of model (default: 6)')
-    parser.add_argument('--embedding_size', type=int, default=768, help='embedding size of token (default: 768)')
-    parser.add_argument('--hidden_size', type=int, default=3072, help='hidden size of position-wise layer (default: 3072)')
-    parser.add_argument('--head_size', type=int, default=12, help='head size of multi head attention (default: 12)')
+    parser.add_argument('--embedding_size', type=int, default=512, help='embedding size of token (default: 512)')
+    parser.add_argument('--hidden_size', type=int, default=2048, help='hidden size of position-wise layer (default: 2048)')
+    parser.add_argument('--head_size', type=int, default=8, help='head size of multi head attention (default: 8)')
     parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training (default: 128)')
     parser.add_argument('--val_batch_size', type=int, default=128, help='input batch size for validing (default: 128)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
@@ -256,5 +256,7 @@ if __name__ == '__main__' :
 
     args = parser.parse_args()
     train(args)
+
+
 
 
