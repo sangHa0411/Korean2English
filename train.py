@@ -177,6 +177,7 @@ def train(args) :
 
             loss.backward()
             optimizer.step()
+            scheduler.step()
         
             progressLearning(idx, len(train_loader), loss.item(), acc.item())
 
@@ -228,8 +229,7 @@ def train(args) :
             if stop_count >= 5 :      
                 print('\tTraining Early Stopped')
                 break
-            
-        scheduler.step()
+        
         print('\nVal Loss : %.3f \t Val Accuracy : %.3f\n' %(loss_eval, acc_eval))
     
 if __name__ == '__main__' :
