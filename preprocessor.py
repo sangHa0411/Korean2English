@@ -39,7 +39,7 @@ def train_spm(dir_path, text_path, model_name, vocab_size) :
         os.path.join(dir_path, model_name), 
         vocab_size, 
         1.0, 
-        'unigram')
+        'bpe')
     spm.SentencePieceTrainer.Train(spm_cmd)
 
 def get_spm(dir_path, model_name) :
