@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset, random_split
+from enum import IntEnum
 
 class Token(IntEnum) :
     PAD = 0
