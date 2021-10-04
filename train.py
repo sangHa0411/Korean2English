@@ -157,7 +157,7 @@ def train(args) :
         idx = 0
         encoder.train()
         decoder.train()
-        print('Epoch : %d/%d \t Learning Rate : %e' %(epoch, args.epochs, optimizer.param_groups[0]["lr"]))
+        print('Epoch : %d/%d' %(epoch, args.epochs))
         # training process
         for data in train_loader :
             en_in = data['encoder_in'].long().to(device)
