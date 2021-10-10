@@ -12,11 +12,12 @@ import torch.optim as optim
 from itertools import chain
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+
 from model import PaddingMask, LookAheadMask, TransformerDecoder, TransformerEncoder
 from dataset import *
 from preprocessor import *
 from collator import *
-from scheduler import Scheduler
+from scheduler import *
 
 def progressLearning(value, endvalue, loss, acc, bar_length=50):
     percent = float(value + 1) / endvalue
@@ -46,19 +47,20 @@ def train(args) :
     text_data = pd.read_csv(args.data_dir)
     kor_data = list(text_data['원문'])
     en_data = list(text_data['번역문'])
+    situation_data = list(text_data['대분류'])
 
     # -- Tokenizer & Encoder
     en_text_path = os.path.join(args.token_dir, 'english.txt')
     if os.path.exists(en_text_path) == False:
         write_data(en_data, en_text_path, preprocess)
-        train_spm(args.token_dir, en_text_path, 'en_tokenizer', args.token_size)
+        train_spm(args.token_dir, 'english.txt', 'en_tokenizer', args.token_size)
     en_spm = get_spm(args.token_dir, 'en_tokenizer')
     en_v_size = len(en_spm)
 
     kor_text_path = os.path.join(args.token_dir, 'korean.txt')
     if os.path.exists(kor_text_path) == False:
         write_data(kor_data, kor_text_path, preprocess)
-        train_spm(args.token_dir, kor_text_path, 'kor_tokenizer', args.token_size)
+        train_spm(args.token_dir, 'korean.txt', 'kor_tokenizer', args.token_size)
     kor_spm = get_spm(args.token_dir, 'kor_tokenizer')
     kor_v_size = len(kor_spm)
 
@@ -79,7 +81,7 @@ def train(args) :
         kor_index_list = kor_spm.encode_as_ids(kor_sen)
         kor_index_data.append(kor_index_list)
 
-    dset = TranslationDataset(kor_index_data, en_index_data, args.max_size, args.val_ratio)
+    dset = TranslationDataset(kor_index_data, en_index_data, situation_data, args.max_size, args.val_ratio)
     train_dset, val_dset = dset.split()
 
     train_len = [(len(data[0]),len(data[1])) for data in train_dset]

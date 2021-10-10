@@ -1,4 +1,5 @@
 import re
+import os
 import sentencepiece as spm
 from dataset import Token
 
@@ -17,13 +18,15 @@ def preprocess(sen) :
     sen = re.sub(' {2,}' , ' ' , sen)
     return sen
 
-def write_data(text_list, text_path, preprocess) :
+def write_data(text_list, text_path, preprocessor) :
     with open(text_path, 'w') as f :
         for sen in text_list :
-            sen = preprocess(sen)
+            sen = preprocessor(sen)
             f.write(sen + '\n')
 
-def train_spm(text_path, model_path, vocab_size) :
+def train_spm(dir_path, text_name, model_name, vocab_size) :
+    text_path = os.path.join(dir_path, text_name)
+    model_path = os.path.join(dir_path, model_name)
     spm_cmd = spm_templates.format(text_path, 
         Token.PAD,
         Token.SOS, 
@@ -35,7 +38,8 @@ def train_spm(text_path, model_path, vocab_size) :
         'bpe')
     spm.SentencePieceTrainer.Train(spm_cmd)
 
-def get_spm(model_path) :
+def get_spm(dir_path, model_name) :
+    model_path = os.path.join(dir_path, model_name) + '.model'
     sp = spm.SentencePieceProcessor()
     sp.Load(model_path)
     sp.SetEncodeExtraOptions('bos:eos')
