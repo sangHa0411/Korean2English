@@ -10,21 +10,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from itertools import chain
-from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from model import TransformerDecoder, TransformerEncoder
+from model import PaddingMask, LookAheadMask, TransformerDecoder, TransformerEncoder
 from dataset import *
 from preprocessor import *
 from collator import *
-
-def schedule_fn(epoch, d_model, init_lr, warmup_steps) :
-    step_num = epoch + 1
-    val1 = d_model ** (-0.5)
-    arg1 = step_num ** (-0.5)
-    arg2 = (warmup_steps ** (-1.5)) * step_num
-    val2 = min(arg1 , arg2) 
-    return (val1 * val2) / init_lr
+from scheduler import Scheduler
 
 def progressLearning(value, endvalue, loss, acc, bar_length=50):
     percent = float(value + 1) / endvalue
@@ -58,14 +50,14 @@ def train(args) :
     # -- Tokenizer & Encoder
     en_text_path = os.path.join(args.token_dir, 'english.txt')
     if os.path.exists(en_text_path) == False:
-        write_data(en_data, en_text_path, preprocess_en)
+        write_data(en_data, en_text_path, preprocess)
         train_spm(args.token_dir, en_text_path, 'en_tokenizer', args.token_size)
     en_spm = get_spm(args.token_dir, 'en_tokenizer')
     en_v_size = len(en_spm)
 
     kor_text_path = os.path.join(args.token_dir, 'korean.txt')
     if os.path.exists(kor_text_path) == False:
-        write_data(kor_data, kor_text_path, preprocess_kor)
+        write_data(kor_data, kor_text_path, preprocess)
         train_spm(args.token_dir, kor_text_path, 'kor_tokenizer', args.token_size)
     kor_spm = get_spm(args.token_dir, 'kor_tokenizer')
     kor_v_size = len(kor_spm)
@@ -76,12 +68,14 @@ def train(args) :
     en_index_data = []
     kor_index_data = []
     for i in range(data_size) :
+        # english data
         en_sen = en_data[i]
-        en_sen = preprocess_en(en_sen)
+        en_sen = preprocess(en_sen)
         en_index_list = en_spm.encode_as_ids(en_sen)
         en_index_data.append(en_index_list)
+        # korean data
         kor_sen = kor_data[i]
-        kor_sen = preprocess_kor(kor_sen)
+        kor_sen = preprocess(kor_sen)
         kor_index_list = kor_spm.encode_as_ids(kor_sen)
         kor_index_data.append(kor_index_list)
 
@@ -106,6 +100,9 @@ def train(args) :
     )
 
     # -- Model
+    # Masking
+    padding_mask = PaddingMask()
+    lookahead_mask = LookAheadMask(use_cuda)
     # Transformer Encoder
     encoder = TransformerEncoder(layer_size=args.layer_size, 
         max_size=args.max_size, 
@@ -130,17 +127,14 @@ def train(args) :
     ).to(device)
 
     model_parameters = chain(encoder.parameters(), decoder.parameters())
-    
+    init_lr = 1e-4
+
     # -- Optimizer
-    optimizer = optim.Adam(model_parameters, lr=1e-4, betas=(0.9,0.98), eps=1e-9)
+    optimizer = optim.Adam(model_parameters, lr=init_lr, betas=(0.9,0.98), eps=1e-9)
 
     # -- Scheduler
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, 
-        lr_lambda = lambda epoch: schedule_fn(epoch = epoch,
-            d_model = args.embedding_size, 
-            init_lr = 1e-4, 
-            warmup_steps=args.warmup_steps)
-    )
+    schedule_fn = Scheduler(args.embedding_size, init_lr, args.warmup_steps)
+    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda = lambda epoch: schedule_fn(epoch))
     
     # -- Logging
     writer = SummaryWriter(args.log_dir)
@@ -162,17 +156,19 @@ def train(args) :
         for data in train_loader :
             
             writer.add_scalar('learning_rate', optimizer.param_groups[0]["lr"], idx)
-            
             en_in = data['encoder_in'].long().to(device)
+            en_mask = padding_mask(en_in)
+
             de_in = data['decoder_in'].long().to(device)
+            de_mask = padding_mask(de_in)
+            de_mask = lookahead_mask(de_mask)
         
             de_label = data['decoder_out'].long().to(device)
             de_label = torch.reshape(de_label, (-1,))
 
             optimizer.zero_grad()
-        
-            en_output, en_pad = encoder(en_in)
-            de_output = decoder(de_in, en_output, en_pad)
+            en_output = encoder(en_in, en_mask)
+            de_output = decoder(de_in, de_mask, en_output, en_mask)
             de_output = torch.reshape(de_output, (-1,en_v_size))
 
             loss = criterion(de_output , de_label)
@@ -184,7 +180,7 @@ def train(args) :
         
             progressLearning(idx, len(train_loader), loss.item(), acc.item())
 
-            if (idx + 1) % 20 == 0 :
+            if (idx + 1) % 100 == 0 :
                 writer.add_scalar('train/loss', loss.item(), log_count)
                 writer.add_scalar('train/acc', acc.item(), log_count)
                 log_count += 1
@@ -200,13 +196,17 @@ def train(args) :
 
             for data in val_loader :
                 en_in = data['encoder_in'].long().to(device)
+                en_mask = padding_mask(en_in)
+
                 de_in = data['decoder_in'].long().to(device)
+                de_mask = padding_mask(de_in)
+                de_mask = lookahead_mask(de_mask)
         
                 de_label = data['decoder_out'].long().to(device)
                 de_label = torch.reshape(de_label, (-1,))
 
-                en_output, en_pad = encoder(en_in)
-                de_output = decoder(de_in, en_output, en_pad)
+                en_output = encoder(en_in, en_mask)
+                de_output = decoder(de_in, de_mask, en_output, en_mask)
                 de_output = torch.reshape(de_output, (-1,en_v_size))
 
                 loss_eval += criterion(de_output, de_label)

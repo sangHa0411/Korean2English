@@ -189,7 +189,7 @@ class DecoderBlock(nn.Module) :
         self.drop3_layer = nn.Dropout(drop_rate)
         self.norm3_layer = nn.LayerNorm(d_model, eps=norm_rate)
                 
-    def forward(self, in_tensor, en_out_tensor, en_pad_mask, de_lookahead_mask) :
+    def forward(self, in_tensor, de_lookahead_mask, en_out_tensor, en_pad_mask) :
         # masked multihead attention sub layer
         # query : in_tensor, key : in_tensor, value : in_tensor, mask ; look ahead mask
         m_mha_tensor = self.m_mha_layer(in_tensor, in_tensor, in_tensor, de_lookahead_mask)
@@ -209,8 +209,7 @@ class DecoderBlock(nn.Module) :
 
 # Transformer Encoder
 class TransformerEncoder(nn.Module) :
-    def __init__(self, layer_size, max_size, v_size, d_model, num_heads, hidden_size, 
-                 drop_rate, norm_rate, cuda_flag) :
+    def __init__(self, layer_size, max_size, v_size, d_model, num_heads, hidden_size, drop_rate, norm_rate, cuda_flag) :
         super(TransformerEncoder , self).__init__()
         self.layer_size = layer_size
         self.max_size = max_size
@@ -240,25 +239,23 @@ class TransformerEncoder(nn.Module) :
         for p in self.parameters() :
             if p.dim() > 1 :
                 nn.init.xavier_uniform_(p)
-            
-    def forward(self, in_tensor) :
-        # masking tensor
-        en_pad_mask = self.pad(in_tensor)
+
+    # input_ids tensor
+    # attention_mask tensor    
+    def forward(self, en_id_tensor, en_mask_tensor) :
         # encoder input tensor
-        em_tensor = self.em(in_tensor) # embedding
+        em_tensor = self.em(en_id_tensor) # embedding
         en_tensor = self.pos(em_tensor) # positional encoding
         en_tensor = self.drop_layer(en_tensor) # dropout layer
         
         tensor_ptr = en_tensor
         for i in range(self.layer_size) :
-            tensor_ptr = self.en_blocks[i](tensor_ptr, en_pad_mask)
-        
-        return tensor_ptr, en_pad_mask
+            tensor_ptr = self.en_blocks[i](tensor_ptr, en_mask_tensor)
+        return tensor_ptr
 
 # Transformer Decoder
 class TransformerDecoder(nn.Module) :
-    def __init__(self, layer_size, max_size, v_size, d_model, num_heads, hidden_size, 
-                 drop_rate, norm_rate, cuda_flag) :
+    def __init__(self, layer_size, max_size, v_size, d_model, num_heads, hidden_size, drop_rate, norm_rate, cuda_flag) :
         super(TransformerDecoder , self).__init__()
         self.layer_size = layer_size
         self.max_size = max_size
@@ -291,19 +288,15 @@ class TransformerDecoder(nn.Module) :
             if p.dim() > 1 :
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, in_tensor, en_out_tensor, en_pad_mask) :
-        # masking tensor
-        de_pad_mask = self.pad(in_tensor)
-        de_lookahead_mask = self.lookahead(de_pad_mask)
+    def forward(self, de_id_tensor, de_mask_tensor, en_out_tensor, en_mask_tensor) :
         # decoder input tensor
-        em_tensor = self.em(in_tensor) # embedding
+        em_tensor = self.em(de_id_tensor) # embedding
         de_tensor = self.pos(em_tensor) # positional encoding
         de_tensor = self.drop_layer(de_tensor) # dropout layer
         
         tensor_ptr = de_tensor
         for i in range(self.layer_size) :
-            tensor_ptr = self.de_blocks[i](tensor_ptr, en_out_tensor, en_pad_mask, de_lookahead_mask)
+            tensor_ptr = self.de_blocks[i](tensor_ptr, de_mask_tensor, en_out_tensor, en_mask_tensor)
         o_tensor = self.o_layer(tensor_ptr)
-        
         return o_tensor
 
