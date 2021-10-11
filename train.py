@@ -67,21 +67,21 @@ def train(args) :
     # -- Dataset
     data_size = len(text_data)
 
-    en_index_data = []
-    kor_index_data = []
+    src_index_data = []
+    tar_index_data = []
     for i in range(data_size) :
         # english data
-        en_sen = en_data[i]
-        en_sen = preprocess(en_sen)
-        en_index_list = en_spm.encode_as_ids(en_sen)
-        en_index_data.append(en_index_list)
+        tar_sen = en_data[i]
+        tar_sen = preprocess(tar_sen)
+        tar_index_list = en_spm.encode_as_ids(tar_sen)
+        tar_index_data.append(tar_index_list)
         # korean data
-        kor_sen = kor_data[i]
-        kor_sen = preprocess(kor_sen)
-        kor_index_list = kor_spm.encode_as_ids(kor_sen)
-        kor_index_data.append(kor_index_list)
+        src_sen = kor_data[i]
+        src_sen = preprocess(src_sen)
+        src_index_list = kor_spm.encode_as_ids(src_sen)
+        src_index_data.append(src_index_list)
 
-    dset = TranslationDataset(kor_index_data, en_index_data, situation_data, args.max_size, args.val_ratio)
+    dset = TranslationDataset(src_index_data, tar_index_data, situation_data, args.max_size, args.val_ratio)
     train_dset, val_dset = dset.split()
 
     train_len = [(len(data[0]),len(data[1])) for data in train_dset]
@@ -222,7 +222,7 @@ def train(args) :
     
         if loss_eval < min_loss :
             min_loss = loss_eval
-            torch.save({'epoch' : (epoch) ,  
+            torch.save({'epoch' : (epoch) ,
                 'encoder_state_dict' : encoder.state_dict() , 
                 'decoder_state_dict' : decoder.state_dict() , 
                 'loss' : loss_eval.item() , 
@@ -242,15 +242,15 @@ if __name__ == '__main__' :
 
     parser.add_argument('--seed', type=int, default=777, help='random seed (default: 777)')
     parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train (default: 30)')
-    parser.add_argument('--token_size', type=int, default=25000, help='token size of bpe (default: 25000)')
+    parser.add_argument('--token_size', type=int, default=16000, help='token size of bpe (default: 16000)')
     parser.add_argument('--warmup_steps', type=int, default=4000, help='warmup steps of train (default: 4000)')
     parser.add_argument('--max_size', type=int, default=128, help='max size of sequence (default: 128)')
     parser.add_argument('--layer_size', type=int, default=6, help='layer size of model (default: 6)')
     parser.add_argument('--embedding_size', type=int, default=512, help='embedding size of token (default: 512)')
     parser.add_argument('--hidden_size', type=int, default=2048, help='hidden size of position-wise layer (default: 2048)')
     parser.add_argument('--head_size', type=int, default=8, help='head size of multi head attention (default: 8)')
-    parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training (default: 128)')
-    parser.add_argument('--val_batch_size', type=int, default=128, help='input batch size for validing (default: 128)')
+    parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')
+    parser.add_argument('--val_batch_size', type=int, default=64, help='input batch size for validing (default: 64)')
     parser.add_argument('--val_ratio', type=float, default=0.1, help='ratio for validaton (default: 0.1)')
 
     # Container environment
